@@ -1,3 +1,59 @@
+<?php
+session_start();
+
+// Si ya está autenticado, redirigir al dashboard
+if (isset($_SESSION['user_id'])) {
+    header('Location: ../../public/index.php');
+    exit;
+}
+
+$error_message = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once '../../config/auth_helper.php';
+    
+    // Obtenemos y sanitizamos entradas
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $role = $_POST['role'] ?? '';
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    
+    if (!empty($name) && !empty($email) && !empty($role) && !empty($password) && !empty($confirm_password)) {
+        if ($password !== $confirm_password) {
+            $error_message = 'Las contraseñas no coinciden.';
+        } elseif (strlen($password) < 6) {
+            $error_message = 'La contraseña debe tener al menos 6 caracteres.';
+        } else {
+            try {
+                // Comprobamos si el correo electrónico ya existe en el archivo JSON
+                if (findUserByEmail($email) !== null) {
+                    $error_message = 'El correo electrónico ya se encuentra registrado.';
+                } else {
+                    // Creamos el usuario en el archivo JSON
+                    $newUser = createUser($name, $email, $role, $password);
+                    
+                    if ($newUser) {
+                        // Iniciamos sesión automáticamente
+                        $_SESSION['user_id'] = $newUser['id'];
+                        $_SESSION['user_name'] = $newUser['name'];
+                        $_SESSION['user_role'] = $newUser['role'];
+                        
+                        header('Location: ../../public/index.php');
+                        exit;
+                    } else {
+                        $error_message = 'No se pudo crear el usuario. Por favor intenta de nuevo.';
+                    }
+                }
+            } catch (Exception $e) {
+                $error_message = 'Error en el servidor: ' . $e->getMessage();
+            }
+        }
+    } else {
+        $error_message = 'Por favor, completa todos los campos obligatorios.';
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -78,8 +134,16 @@
                     <p class="text-muted fs-7">Regístrate para comenzar a gestionar tu negocio.</p>
                 </div>
 
+                <!-- Alerta de Error -->
+                <?php if (!empty($error_message)): ?>
+                    <div class="alert alert-danger border-0 rounded-3 fs-8 py-2.5 px-3 mb-3 d-flex align-items-center gap-2" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill fs-7"></i>
+                        <div><?php echo htmlspecialchars($error_message); ?></div>
+                    </div>
+                <?php endif; ?>
+
                 <!-- Formulario -->
-                <form action="../../public/index.php" method="POST" id="registerForm">
+                <form action="register.php" method="POST" id="registerForm">
                     
                     <!-- Campo Nombre -->
                     <div class="mb-3">
@@ -255,12 +319,14 @@
                     return;
                 }
 
-                const btnText = submitBtn.querySelector('span');
-                const btnIcon = submitBtn.querySelector('i');
-                
-                submitBtn.disabled = true;
-                btnText.textContent = 'Registrando usuario...';
-                btnIcon.className = 'spinner-border spinner-border-sm';
+                if (registerForm.checkValidity()) {
+                    const btnText = submitBtn.querySelector('span');
+                    const btnIcon = submitBtn.querySelector('i');
+                    
+                    submitBtn.disabled = true;
+                    btnText.textContent = 'Registrando usuario...';
+                    btnIcon.className = 'spinner-border spinner-border-sm';
+                }
             });
         });
     </script>

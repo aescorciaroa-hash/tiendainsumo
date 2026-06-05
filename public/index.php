@@ -1,3 +1,33 @@
+<?php
+session_start();
+
+// Cierre de Sesión (Logout)
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    session_unset();
+    session_destroy();
+    header('Location: ../views/auth/login.php');
+    exit;
+}
+
+// Control de Acceso: Redirigir al login si no está autenticado
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../views/auth/login.php');
+    exit;
+}
+
+// Obtenemos los datos dinámicos del usuario
+$session_user_name = $_SESSION['user_name'] ?? 'Usuario';
+$session_user_role_code = $_SESSION['user_role'] ?? 'user';
+
+// Mapear código de rol a texto amigable
+$role_names = [
+    'admin' => 'Admin General',
+    'cajero' => 'Cajero de POS',
+    'bodeguero' => 'Bodeguero / Almacén',
+    'director' => 'Director de Ventas'
+];
+$session_user_role = $role_names[$session_user_role_code] ?? 'Colaborador';
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -80,8 +110,8 @@
                     <a href="#" class="profile-dropdown-btn d-flex align-items-center text-decoration-none" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                         <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=120&h=120" alt="Profile" class="profile-avatar me-2">
                         <div class="d-none d-sm-block text-start me-2">
-                            <div class="profile-name">Ing. Carlos Ruiz</div>
-                            <span class="profile-role">Admin General</span>
+                            <div class="profile-name"><?php echo htmlspecialchars($session_user_name); ?></div>
+                            <span class="profile-role"><?php echo htmlspecialchars($session_user_role); ?></span>
                         </div>
                         <i class="bi bi-chevron-down text-muted fs-8 ms-1"></i>
                     </a>
@@ -89,7 +119,7 @@
                         <li><a class="dropdown-item py-2" href="#"><i class="bi bi-person me-2"></i>Mi Perfil</a></li>
                         <li><a class="dropdown-item py-2" href="#"><i class="bi bi-gear me-2"></i>Configuración</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item py-2 text-danger" href="#"><i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión</a></li>
+                        <li><a class="dropdown-item py-2 text-danger" href="index.php?action=logout"><i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión</a></li>
                     </ul>
                 </div>
             </div>
