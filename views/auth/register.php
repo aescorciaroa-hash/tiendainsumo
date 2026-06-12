@@ -1,58 +1,5 @@
 <?php
 session_start();
-
-// Si ya está autenticado, redirigir al dashboard
-if (isset($_SESSION['user_id'])) {
-    header('Location: ../../public/index.php');
-    exit;
-}
-
-$error_message = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once '../../config/auth_helper.php';
-    
-    // Obtenemos y sanitizamos entradas
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $role = $_POST['role'] ?? '';
-    $password = $_POST['password'] ?? '';
-    $confirm_password = $_POST['confirm_password'] ?? '';
-    
-    if (!empty($name) && !empty($email) && !empty($role) && !empty($password) && !empty($confirm_password)) {
-        if ($password !== $confirm_password) {
-            $error_message = 'Las contraseñas no coinciden.';
-        } elseif (strlen($password) < 6) {
-            $error_message = 'La contraseña debe tener al menos 6 caracteres.';
-        } else {
-            try {
-                // Comprobamos si el correo electrónico ya existe en el archivo JSON
-                if (findUserByEmail($email) !== null) {
-                    $error_message = 'El correo electrónico ya se encuentra registrado.';
-                } else {
-                    // Creamos el usuario en el archivo JSON
-                    $newUser = createUser($name, $email, $role, $password);
-                    
-                    if ($newUser) {
-                        // Iniciamos sesión automáticamente
-                        $_SESSION['user_id'] = $newUser['id'];
-                        $_SESSION['user_name'] = $newUser['name'];
-                        $_SESSION['user_role'] = $newUser['role'];
-                        
-                        header('Location: ../../public/index.php');
-                        exit;
-                    } else {
-                        $error_message = 'No se pudo crear el usuario. Por favor intenta de nuevo.';
-                    }
-                }
-            } catch (Exception $e) {
-                $error_message = 'Error en el servidor: ' . $e->getMessage();
-            }
-        }
-    } else {
-        $error_message = 'Por favor, completa todos los campos obligatorios.';
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -134,22 +81,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <p class="text-muted fs-7">Regístrate para comenzar a gestionar tu negocio.</p>
                 </div>
 
-                <!-- Alerta de Error -->
-                <?php if (!empty($error_message)): ?>
-                    <div class="alert alert-danger border-0 rounded-3 fs-8 py-2.5 px-3 mb-3 d-flex align-items-center gap-2" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill fs-7"></i>
-                        <div><?php echo htmlspecialchars($error_message); ?></div>
-                    </div>
-                <?php endif; ?>
+
 
                 <!-- Formulario -->
-                <form action="register.php" method="POST" id="registerForm">
+                <form action="../../controllers/auth/registerController.php" method="POST" id="registerForm">
                     
                     <!-- Campo Nombre -->
                     <div class="mb-3">
                         <label for="name" class="form-label fs-8 fw-semibold text-dark">Nombre Completo</label>
                         <div class="form-icon-group">
-                            <input type="text" class="form-control" id="name" name="name" placeholder="Ingresa tu nombre y apellido" required>
+                            <input type="text" class="form-control" id="name" name="usuario" placeholder="Ingresa tu nombre y apellido" required>
                             <i class="bi bi-person input-icon"></i>
                         </div>
                     </div>
@@ -163,20 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </div>
                     </div>
 
-                    <!-- Selector de Rol -->
-                    <div class="mb-3">
-                        <label for="role" class="form-label fs-8 fw-semibold text-dark">Rol en el Sistema</label>
-                        <div class="form-icon-group">
-                            <select class="form-select text-muted" id="role" name="role" required>
-                                <option value="" disabled selected>Selecciona tu puesto...</option>
-                                <option value="admin">Administrador General</option>
-                                <option value="cajero">Cajero / Operador POS</option>
-                                <option value="bodeguero">Bodeguero / Almacén</option>
-                                <option value="director">Director de Ventas</option>
-                            </select>
-                            <i class="bi bi-briefcase input-icon"></i>
-                        </div>
-                    </div>
+
 
                     <!-- Campo Contraseña -->
                     <div class="mb-3">
@@ -206,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <!-- Términos y Condiciones -->
                     <div class="mb-4">
                         <div class="form-check d-flex align-items-start">
-                            <input class="form-check-input form-check-input-custom me-2 mt-1" type="checkbox" id="terms" name="terms" required>
+                            <input class="form-check-input form-check-input-custom me-2 mt-1" type="checkbox" id="terms" name="terminos" required>
                             <label class="form-check-label fs-8 text-muted" for="terms">
                                 Acepto los <a href="#" class="text-success text-decoration-none fw-medium">Términos de Servicio</a> y la <a href="#" class="text-success text-decoration-none fw-medium">Política de Privacidad</a> de AgroStock PRO.
                             </label>
@@ -233,102 +161,107 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
-    <!-- Bootstrap 5 JS Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Script de Interactividad del Registro -->
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Custom Client-Side Scripts -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const password = document.getElementById('password');
-            const confirmPassword = document.getElementById('confirm_password');
+            const passwordInput = document.getElementById('password');
+            const confirmInput = document.getElementById('confirm_password');
+            const toggleBtn1 = document.getElementById('togglePasswordBtn1');
+            const toggleIcon1 = document.getElementById('toggleIcon1');
+            const toggleBtn2 = document.getElementById('togglePasswordBtn2');
+            const toggleIcon2 = document.getElementById('toggleIcon2');
             const matchMessage = document.getElementById('matchMessage');
-            const submitBtn = document.getElementById('submitBtn');
-            const registerForm = document.getElementById('registerForm');
-            const selectRole = document.getElementById('role');
+            const form = document.getElementById('registerForm');
 
-            // Cambiar color de texto del selector de rol según selección
-            selectRole.addEventListener('change', function() {
-                if (this.value !== "") {
-                    this.classList.remove('text-muted');
-                    this.classList.add('text-dark');
-                }
-            });
-
-            // Toggles de Contraseña
-            function setupPasswordToggle(inputId, buttonId, iconId) {
-                const input = document.getElementById(inputId);
-                const button = document.getElementById(buttonId);
-                const icon = document.getElementById(iconId);
-
-                button.addEventListener('click', function() {
-                    const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
-                    input.setAttribute('type', type);
-                    
-                    if (type === 'text') {
-                        icon.classList.remove('bi-eye-slash');
-                        icon.classList.add('bi-eye');
-                        button.setAttribute('aria-label', 'Ocultar contraseña');
-                    } else {
-                        icon.classList.remove('bi-eye');
-                        icon.classList.add('bi-eye-slash');
-                        button.setAttribute('aria-label', 'Mostrar contraseña');
-                    }
+            // Alternar visibilidad de contraseña 1
+            if (toggleBtn1) {
+                toggleBtn1.addEventListener('click', function() {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    toggleIcon1.classList.toggle('bi-eye');
+                    toggleIcon1.classList.toggle('bi-eye-slash');
                 });
             }
 
-            setupPasswordToggle('password', 'togglePasswordBtn1', 'toggleIcon1');
-            setupPasswordToggle('confirm_password', 'togglePasswordBtn2', 'toggleIcon2');
+            // Alternar visibilidad de contraseña 2
+            if (toggleBtn2) {
+                toggleBtn2.addEventListener('click', function() {
+                    const type = confirmInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    confirmInput.setAttribute('type', type);
+                    toggleIcon2.classList.toggle('bi-eye');
+                    toggleIcon2.classList.toggle('bi-eye-slash');
+                });
+            }
 
-            // Validación en Vivo: Coincidencia de Contraseñas
-            function validatePasswords() {
-                const passVal = password.value;
-                const confVal = confirmPassword.value;
+            // Validar si las contraseñas coinciden en tiempo real
+            function checkPasswords() {
+                const psw = passwordInput.value;
+                const confirmPsw = confirmInput.value;
 
-                if (confVal === '') {
+                if (confirmPsw === '') {
                     matchMessage.classList.add('d-none');
-                    confirmPassword.classList.remove('border-danger', 'border-success');
-                    submitBtn.disabled = false;
                     return;
                 }
 
                 matchMessage.classList.remove('d-none');
-
-                if (passVal === confVal) {
-                    matchMessage.textContent = '✓ Las contraseñas coinciden.';
-                    matchMessage.className = 'fs-9 mt-1 text-success fw-medium';
-                    confirmPassword.classList.remove('border-danger');
-                    confirmPassword.classList.add('border-success');
-                    submitBtn.disabled = false;
+                if (psw === confirmPsw) {
+                    matchMessage.textContent = 'Las contraseñas coinciden.';
+                    matchMessage.className = 'fs-9 mt-1 text-success';
                 } else {
-                    matchMessage.textContent = '✗ Las contraseñas no coinciden.';
-                    matchMessage.className = 'fs-9 mt-1 text-danger fw-medium';
-                    confirmPassword.classList.remove('border-success');
-                    confirmPassword.classList.add('border-danger');
-                    submitBtn.disabled = true; // Deshabilita el botón si no coinciden
+                    matchMessage.textContent = 'Las contraseñas no coinciden.';
+                    matchMessage.className = 'fs-9 mt-1 text-danger';
                 }
             }
 
-            password.addEventListener('input', validatePasswords);
-            confirmPassword.addEventListener('input', validatePasswords);
+            if (passwordInput && confirmInput) {
+                passwordInput.addEventListener('input', checkPasswords);
+                confirmInput.addEventListener('input', checkPasswords);
+            }
 
-            // Simulación de envío
-            registerForm.addEventListener('submit', function(e) {
-                if (password.value !== confirmPassword.value) {
-                    e.preventDefault();
-                    alert('Las contraseñas deben coincidir para registrarse.');
-                    return;
-                }
-
-                if (registerForm.checkValidity()) {
-                    const btnText = submitBtn.querySelector('span');
-                    const btnIcon = submitBtn.querySelector('i');
-                    
-                    submitBtn.disabled = true;
-                    btnText.textContent = 'Registrando usuario...';
-                    btnIcon.className = 'spinner-border spinner-border-sm';
-                }
-            });
+            // Evitar envío del formulario si no coinciden
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    if (passwordInput.value !== confirmInput.value) {
+                        e.preventDefault();
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Contraseñas no coinciden',
+                            text: 'Asegúrate de que ambas contraseñas sean idénticas antes de registrarte.',
+                            confirmButtonColor: '#10b981',
+                            background: '#1e293b',
+                            color: '#fff',
+                            customClass: {
+                                popup: 'rounded-4 border border-secondary'
+                            }
+                        });
+                    }
+                });
+            }
         });
     </script>
+
+    <!-- SweetAlert2 Server-Side PHP Alert Trigger -->
+    <?php if (isset($_SESSION['swal'])): ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                Swal.fire({
+                    icon: '<?php echo $_SESSION['swal']['icon']; ?>',
+                    title: '<?php echo $_SESSION['swal']['title']; ?>',
+                    text: '<?php echo $_SESSION['swal']['text']; ?>',
+                    confirmButtonColor: '#10b981',
+                    background: '#1e293b',
+                    color: '#fff',
+                    customClass: {
+                        popup: 'rounded-4 border border-secondary'
+                    }
+                });
+            });
+        </script>
+        <?php unset($_SESSION['swal']); ?>
+    <?php endif; ?>
+
 </body>
 </html>

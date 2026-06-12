@@ -1,44 +1,5 @@
 <?php
 session_start();
-
-// Si ya está autenticado, redirigir al dashboard
-if (isset($_SESSION['user_id'])) {
-    header('Location: ../../public/index.php');
-    exit;
-}
-
-$error_message = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once '../../config/auth_helper.php';
-    
-    // Obtenemos y sanitizamos entradas
-    $email = trim($_POST['email'] ?? '');
-    $password = $_POST['password'] ?? '';
-    
-    if (!empty($email) && !empty($password)) {
-        try {
-            // Buscamos el usuario en el archivo JSON
-            $user = findUserByEmail($email);
-            
-            if ($user && password_verify($password, $user['password'])) {
-                // Autenticación exitosa
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['user_name'] = $user['name'];
-                $_SESSION['user_role'] = $user['role'];
-                
-                header('Location: ../../public/index.php');
-                exit;
-            } else {
-                $error_message = 'Correo electrónico o contraseña incorrectos.';
-            }
-        } catch (Exception $e) {
-            $error_message = 'Ocurrió un error en el servidor: ' . $e->getMessage();
-        }
-    } else {
-        $error_message = 'Por favor, completa todos los campos.';
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -131,14 +92,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <p class="text-muted fs-7">Ingresa tus credenciales para acceder al sistema.</p>
                 </div>
 
-                <!-- Alerta de Error -->
-                <?php if (!empty($error_message)): ?>
-                    <div class="alert alert-danger border-0 rounded-3 fs-8 py-2.5 px-3 mb-3 d-flex align-items-center gap-2" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill fs-7"></i>
-                        <div><?php echo htmlspecialchars($error_message); ?></div>
-                    </div>
-                <?php endif; ?>
-
                 <!-- Formulario -->
                 <form action="login.php" method="POST" id="loginForm">
                     
@@ -196,48 +149,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
 
-    <!-- Bootstrap 5 JS Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Script de Interactividad del Login -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const passwordInput = document.getElementById('password');
-            const togglePasswordBtn = document.getElementById('togglePasswordBtn');
-            const toggleIcon = document.getElementById('toggleIcon');
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-            // Mostrar/Ocultar Contraseña
-            togglePasswordBtn.addEventListener('click', function() {
-                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                passwordInput.setAttribute('type', type);
-                
-                // Cambiar ícono
-                if (type === 'text') {
-                    toggleIcon.classList.remove('bi-eye-slash');
-                    toggleIcon.classList.add('bi-eye');
-                    togglePasswordBtn.setAttribute('aria-label', 'Ocultar contraseña');
-                } else {
-                    toggleIcon.classList.remove('bi-eye');
-                    toggleIcon.classList.add('bi-eye-slash');
-                    togglePasswordBtn.setAttribute('aria-label', 'Mostrar contraseña');
-                }
+    <!-- SweetAlert2 Server-Side PHP Alert Trigger -->
+    <?php if (isset($_SESSION['swal'])): ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                Swal.fire({
+                    icon: '<?php echo $_SESSION['swal']['icon']; ?>',
+                    title: '<?php echo $_SESSION['swal']['title']; ?>',
+                    text: '<?php echo $_SESSION['swal']['text']; ?>',
+                    confirmButtonColor: '#10b981',
+                    background: '#1e293b',
+                    color: '#fff',
+                    customClass: {
+                        popup: 'rounded-4 border border-secondary'
+                    }
+                });
             });
+        </script>
+        <?php unset($_SESSION['swal']); ?>
+    <?php endif; ?>
 
-            // Animación de envío de formulario (Simulación)
-            const loginForm = document.getElementById('loginForm');
-            loginForm.addEventListener('submit', function(e) {
-                // Solo activamos spinner si los campos están completos
-                if (loginForm.checkValidity()) {
-                    const btn = loginForm.querySelector('button[type="submit"]');
-                    const btnText = btn.querySelector('span');
-                    const btnIcon = btn.querySelector('i');
-                    
-                    btn.disabled = true;
-                    btnText.textContent = 'Autenticando...';
-                    btnIcon.className = 'spinner-border spinner-border-sm';
-                }
-            });
-        });
-    </script>
 </body>
 </html>
+        
